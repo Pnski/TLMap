@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link
+			rel="stylesheet"
+			href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+			integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+			crossorigin=""
+		/>
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+			#map {
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<script
+			src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+			integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+			crossorigin=""
+		></script>
+		<script>
+			var attribution = "Map data Throne and Liberty";
+
+			// Initialize the map with a simple CRS
+			var map = L.map("map", {
+				center: [2048, 2048], // Centered on the middle of the image
+				zoom: 0,
+				crs: L.CRS.Simple,
+				minZoom: 0,
+				maxZoom: 1, // Allow zoom levels 0 and 1
+			});
+
+			// Define the bounds of the image in pixels
+			var bounds = [
+				[0, 0],
+				[4096, 4096],
+			];
+
+			// Add the overview image at zoom level 0
+			L.imageOverlay("map_tiles/0/0/0.png", bounds).addTo(map);
+
+			// Set tile bounds based on the correct row and column limits
+			const tileBounds = {
+				minX: 0,
+				minY: 0,
+				maxX: 37, // 38 tiles in x-direction (0 to 37)
+				maxY: 37, // 38 tiles in y-direction (0 to 37)
+			};
+
+			// Add the tile layer for zoom level 1 with restricted bounds
+			L.tileLayer("map_tiles/{z}/{y}/{x}.png", {
+				attribution: attribution,
+				minZoom: 0,
+				maxZoom: 1,
+				tileSize: 256,
+				noWrap: true,
+				bounds: bounds,
+				tms: true,
+			}).addTo(map);
+
+			// Filter out requests for invalid tile coordinates
+			map.on("tileloadstart", function (event) {
+				const { x, y, z } = event.coords;
+				if (z === 1 && (x < tileBounds.minX || y < tileBounds.minY || x > tileBounds.maxX || y > tileBounds.maxY)) {
+					event.tile.src = ""; // Cancel loading out-of-bounds tiles
+				}
+			});
+
+			// Fit the map view to the bounds of the image
+			map.fitBounds(bounds);
+		</script>
+	</body>
+</html>
