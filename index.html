@@ -8,6 +8,7 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
+
     <style>
       #map {
         width: 100%;
@@ -45,9 +46,15 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
     <script>
       const map = L.map("map", {
         crs: L.CRS.Simple,
+        zoomSnap: 0.25, // Enable zoom steps of 0.25
+        zoomDelta: 0.25, // Make each zoom action increment by 0.25
+		scrollWheelZoom: true,
+        wheelPxPerZoomLevel: 250, // Adjust scroll wheel sensitivity for finer control
       }).setView([-5000.0, 5000.0], -1); // Set default zoom level to -1
 
       const tile = L.tileLayer("./map_tiles/{x}_{y}.png", {
@@ -70,13 +77,12 @@
 
       var greenIcon = new RuneIcon({ iconUrl: "images/icons/6.png" }),
         redIcon = new RuneIcon({ iconUrl: "images/icons/7.png" }),
-        orangeIcon = new RuneIcon({ iconUrl: "images/icons/2.png" });
-      pinkIcon = new RuneIcon({ iconUrl: "images/icons/1.png" });
-      tealIcon = new RuneIcon({ iconUrl: "images/icons/3.png" });
-      purpleIcon = new RuneIcon({ iconUrl: "images/icons/4.png" });
-      blueIcon = new RuneIcon({ iconUrl: "images/icons/5.png" });
+        orangeIcon = new RuneIcon({ iconUrl: "images/icons/2.png" }),
+        pinkIcon = new RuneIcon({ iconUrl: "images/icons/1.png" }),
+        tealIcon = new RuneIcon({ iconUrl: "images/icons/3.png" }),
+        purpleIcon = new RuneIcon({ iconUrl: "images/icons/4.png" }),
+        blueIcon = new RuneIcon({ iconUrl: "images/icons/5.png" });
 
-      // Define icon choices
       const iconOptions = {
         green: greenIcon,
         red: redIcon,
@@ -89,7 +95,7 @@
 
       let markers = [];
 
-      // Function to add marker on click
+      // Add marker on click
       map.on("click", function (e) {
         const selectedIcon = document.getElementById("iconSelect").value;
         const marker = L.marker([e.latlng.lat, e.latlng.lng], {
@@ -101,57 +107,95 @@
           )
           .openPopup();
 
-        // Add marker to markers array with default name
         markers.push({
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
-          title: "", // Placeholder for marker name
-          icon: selectedIcon,
+          lat: e.latlng.lat.toFixed(5),
+          lng: e.latlng.lng.toFixed(5),
+          t: "",
+          i: selectedIcon.charAt(0),
         });
 
-        // Update the shareable link
         updateShareableLink();
       });
 
-      // Update marker name based on user input
+      // Update marker name
       function updateMarkerName(input, index) {
-        markers[index].title = input.value;
+        markers[index].t = input.value;
         updateShareableLink();
       }
 
-      // Generate shareable link
+      // Generate shareable link with LZ compression and map view
       function updateShareableLink() {
-        const encoded = encodeURIComponent(JSON.stringify(markers));
+        const jsonData = JSON.stringify({
+          markers: markers,
+          view: {
+            center: map.getCenter(),
+            zoom: map.getZoom(),
+          },
+        });
+        const compressedData = LZString.compressToEncodedURIComponent(jsonData);
         document.getElementById(
           "shareLink"
-        ).value = `${window.location.origin}${window.location.pathname}?markers=${encoded}`;
+        ).value = `${window.location.origin}${window.location.pathname}?m=${compressedData}`;
       }
 
-      // Load markers from URL
+      // Load markers and view from URL with LZ decompression
       function loadMarkersFromURL() {
         const params = new URLSearchParams(window.location.search);
-        if (params.has("markers")) {
-          const markersData = JSON.parse(
-            decodeURIComponent(params.get("markers"))
+        if (params.has("m")) {
+          const compressedData = params.get("m");
+          const data = JSON.parse(
+            LZString.decompressFromEncodedURIComponent(compressedData)
           );
-          markersData.forEach((markerData, index) => {
-            const icon = iconOptions[markerData.icon] || greenIcon;
-            const marker = L.marker([markerData.lat, markerData.lng], {
-              icon: icon,
-            })
-              .addTo(map)
-              .bindPopup(
-                `<input type="text" value="${markerData.title}" placeholder="Marker Name" onchange="updateMarkerName(this, ${index})" />`
-              );
 
-            markers.push(markerData); // Add to markers array
-          });
+          // Set map view from URL data
+          if (data.view) {
+            map.setView(
+              [data.view.center.lat, data.view.center.lng],
+              data.view.zoom
+            );
+          }
+
+          // Add markers from URL data
+          if (data.markers) {
+            data.markers.forEach((markerData, index) => {
+              const icon =
+                iconOptions[
+                  markerData.i === "g"
+                    ? "green"
+                    : markerData.i === "r"
+                    ? "red"
+                    : markerData.i === "o"
+                    ? "orange"
+                    : markerData.i === "p"
+                    ? "pink"
+                    : markerData.i === "b"
+                    ? "blue"
+                    : markerData.i === "t"
+                    ? "teal"
+                    : "purple"
+                ];
+              const marker = L.marker(
+                [parseFloat(markerData.lat), parseFloat(markerData.lng)],
+                { icon: icon }
+              )
+                .addTo(map)
+                .bindPopup(
+                  `<input type="text" value="${markerData.t}" placeholder="Marker Name" onchange="updateMarkerName(this, ${index})" />`
+                );
+
+              markers.push(markerData);
+            });
+          }
+
           updateShareableLink();
         }
       }
 
-      // Load markers if present in URL on page load
+      // Load markers and view on page load
       loadMarkersFromURL();
+
+      // Update shareable link on map move
+      map.on("moveend", updateShareableLink);
     </script>
   </body>
 </html>
