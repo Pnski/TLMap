@@ -1,34 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Leaflet Map</title>
-		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-		<style>
-			#map {
-				width: 100%;
-				height: 100vh;
-			}
-		</style>
-	</head>
-	<body>
-		<div id="map"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaflet Map</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      #map {
+        width: 100%;
+        height: 80vh;
+      }
+      #controls {
+        margin: 10px;
+        text-align: center;
+      }
+      #shareLink {
+        width: 80%;
+        padding: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="controls">
+      <label for="iconSelect">Choose Marker Icon:</label>
+      <select id="iconSelect">
+        <option value="green">Green</option>
+        <option value="red">Red</option>
+        <option value="orange">Orange</option>
+        <option value="pink">Pink</option>
+        <option value="blue">Blue</option>
+        <option value="teal">Teal</option>
+        <option value="purple">purple</option>
+      </select>
+      <input
+        id="shareLink"
+        type="text"
+        readonly
+        placeholder="Shareable link will appear here"
+      />
+    </div>
 
-		<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-		<script>
-			const map = L.map("map", {
-				crs: L.CRS.Simple,
-			}).setView([0.0, 0.0], 0);
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      const map = L.map("map", {
+        crs: L.CRS.Simple,
+      }).setView([-4000.0, 2000.0], -1); // Set default zoom level to -1
 
-			const tile = L.tileLayer("./map_tiles/{x}_{y}.png", {
-				minZoom: -2,
-				maxZoom: 3,
-				tileSize: 256,
-				maxNativeZoom: 0,
-				minNativeZoom: 0,
-				tms: true,
-			}).addTo(map);
-		</script>
-	</body>
+      const tile = L.tileLayer("./map_tiles/{x}_{y}.png", {
+        minZoom: -2,
+        maxZoom: 3,
+        tileSize: 256,
+        maxNativeZoom: 0,
+        minNativeZoom: 0,
+        tms: true,
+      }).addTo(map);
+
+      // Define icons
+      var RuneIcon = L.Icon.extend({
+        options: {
+          iconSize: [64, 64],
+          iconAnchor: [32, 56],
+          popupAnchor: [0, -56],
+        },
+      });
+
+      var greenIcon = new RuneIcon({ iconUrl: "images/icons/6.png" }),
+        redIcon = new RuneIcon({ iconUrl: "images/icons/7.png" }),
+        orangeIcon = new RuneIcon({ iconUrl: "images/icons/2.png" });
+      pinkIcon = new RuneIcon({ iconUrl: "images/icons/1.png" });
+      tealIcon = new RuneIcon({ iconUrl: "images/icons/3.png" });
+      purpleIcon = new RuneIcon({ iconUrl: "images/icons/4.png" });
+      blueIcon = new RuneIcon({ iconUrl: "images/icons/5.png" });
+
+      // Define icon choices
+      const iconOptions = {
+        green: greenIcon,
+        red: redIcon,
+        orange: orangeIcon,
+        pink: pinkIcon,
+        blue: blueIcon,
+        teal: tealIcon,
+        purple: purpleIcon,
+      };
+
+      let markers = [];
+
+      // Function to add marker on click
+      map.on("click", function (e) {
+        const selectedIcon = document.getElementById("iconSelect").value;
+        const marker = L.marker([e.latlng.lat, e.latlng.lng], {
+          icon: iconOptions[selectedIcon],
+        })
+          .addTo(map)
+          .bindPopup(
+            `<input type="text" placeholder="Marker Name" onchange="updateMarkerName(this, ${markers.length})" />`
+          )
+          .openPopup();
+
+        // Add marker to markers array with default name
+        markers.push({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          title: "", // Placeholder for marker name
+          icon: selectedIcon,
+        });
+
+        // Update the shareable link
+        updateShareableLink();
+      });
+
+      // Update marker name based on user input
+      function updateMarkerName(input, index) {
+        markers[index].title = input.value;
+        updateShareableLink();
+      }
+
+      // Generate shareable link
+      function updateShareableLink() {
+        const encoded = encodeURIComponent(JSON.stringify(markers));
+        document.getElementById(
+          "shareLink"
+        ).value = `${window.location.origin}${window.location.pathname}?markers=${encoded}`;
+      }
+
+      // Load markers from URL
+      function loadMarkersFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has("markers")) {
+          const markersData = JSON.parse(
+            decodeURIComponent(params.get("markers"))
+          );
+          markersData.forEach((markerData, index) => {
+            const icon = iconOptions[markerData.icon] || greenIcon;
+            const marker = L.marker([markerData.lat, markerData.lng], {
+              icon: icon,
+            })
+              .addTo(map)
+              .bindPopup(
+                `<input type="text" value="${markerData.title}" placeholder="Marker Name" onchange="updateMarkerName(this, ${index})" />`
+              );
+
+            markers.push(markerData); // Add to markers array
+          });
+          updateShareableLink();
+        }
+      }
+
+      // Load markers if present in URL on page load
+      loadMarkersFromURL();
+    </script>
+  </body>
 </html>
